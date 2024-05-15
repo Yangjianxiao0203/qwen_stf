@@ -3,6 +3,7 @@ from torch.utils.data import DataLoader
 from datasets import load_dataset
 from tqdm import tqdm
 import torch
+from torch.cuda.amp import GradScaler, autocast
 
 tokenizer = AutoTokenizer.from_pretrained("/root/model/Qwen1.5-0.5B")
 model = AutoModelForCausalLM.from_pretrained("/root/model/Qwen1.5-0.5B")
@@ -44,36 +45,35 @@ class CustomDataCollator:
         }
 
 
-train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True, collate_fn=CustomDataCollator(tokenizer))
-eval_loader = DataLoader(eval_dataset, batch_size=4, collate_fn=CustomDataCollator(tokenizer))
+train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True, collate_fn=CustomDataCollator(tokenizer))
+eval_loader = DataLoader(eval_dataset, batch_size=2, collate_fn=CustomDataCollator(tokenizer))
 
 # 训练参数
 epochs = 3
+
+scaler = GradScaler()
 
 model.train()
 for epoch in range(epochs):
     total_loss = 0
     for batch in tqdm(train_loader, desc=f"Training Epoch {epoch + 1}"):
-        # 将数据移至相应设备
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         labels = batch['labels'].to(device)
 
-        # 清除之前的梯度
         optimizer.zero_grad()
 
-        # 前向传播
-        outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
-        loss = outputs.loss
+        # 使用自动混合精度
+        with autocast():
+            outputs = model(input_ids, attention_mask=attention_mask, labels=labels)
+            loss = outputs.loss
 
-        # 反向传播
-        loss.backward()
-
-        # 更新参数
-        optimizer.step()
+        # 缩放损失以进行梯度反向传播
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
 
         total_loss += loss.item()
 
-    # 计算平均损失
     avg_train_loss = total_loss / len(train_loader)
     print(f"Average Training Loss: {avg_train_loss:.4f}")
