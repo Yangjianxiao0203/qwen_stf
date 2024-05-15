@@ -1,0 +1,4 @@
+transformers
+deepspeed
+torch
+datasets
