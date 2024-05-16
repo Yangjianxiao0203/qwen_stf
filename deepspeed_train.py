@@ -4,8 +4,8 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 import torch
 
-tokenizer = AutoTokenizer.from_pretrained("/root/model/Qwen1.5-0.5B")
-model = AutoModelForCausalLM.from_pretrained("/root/model/Qwen1.5-0.5B")
+tokenizer = AutoTokenizer.from_pretrained("/root/models/Qwen1.5-0.5B")
+model = AutoModelForCausalLM.from_pretrained("/root/models/Qwen1.5-0.5B")
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 data_files = {
     "train": "/root/data/AdvertiseGen/train.json",

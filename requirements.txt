@@ -2,3 +2,4 @@ transformers
 deepspeed
 torch
 datasets
+mpi4py
