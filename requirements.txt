@@ -1,5 +1,6 @@
 transformers
-deepspeed
 torch
 datasets
 mpi4py
+peft
+deepspeed
