@@ -1,0 +1,21 @@
+{
+  "epochs" : 1,
+  "task_type": "classification",
+  "optimizer": {
+    "type": "AdamW",
+    "params": {
+      "lr": 5e-5,
+      "betas": [0.9, 0.999],
+      "eps": 1e-8,
+      "weight_decay": 3e-7
+    }
+  },
+  "scheduler": {
+    "type": "WarmupLR",
+    "params": {
+      "warmup_min_lr": 0,
+      "warmup_max_lr": 0.00015,
+      "warmup_num_steps": 1000
+    }
+  }
+}

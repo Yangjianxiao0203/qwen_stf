@@ -1,7 +1,8 @@
+import os
+
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from transformers import BertModel, BertTokenizer, AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification
 
 
 def create_lora_forward(original_forward, lora_layer, scaling):
@@ -27,7 +28,7 @@ class LoRA(nn.Module):
         self.scaling = self.lora_alpha / self.r
         self.lora_layers = nn.ModuleDict()
         self.lora_name_mapper = {}
-        self._freeze_original_layers()
+        # self._freeze_original_layers()
         self._initialize_lora_layers()
 
     def _freeze_original_layers(self):
@@ -36,19 +37,18 @@ class LoRA(nn.Module):
             param.requires_grad = False
 
     def _initialize_lora_layers(self):
+        self._freeze_original_layers()
         for name, module in self.model.named_modules():
             for target_name in self.target_modules:
                 if target_name in name:
                     lora_name = self._replace_module_name(name)
                     lora_layer = self._create_lora_layer(module)
                     self.lora_layers[lora_name] = lora_layer
-                    self.lora_name_mapper["name"] = lora_name
+                    self.lora_name_mapper[name] = lora_name
                     module.forward = create_lora_forward(module.forward,lora_layer,self.scaling)
-            # if any(target in name for target in self.target_modules):
-            #     self.lora_layers[name] = self._create_lora_layer(module)
 
     def _replace_module_name(self, module_name):
-        return module_name.replace(".", "_")
+        return "lora_" + module_name.replace(".", "__")
 
     def _create_lora_layer(self, module):
         #  W0 (a,b) -> W0 + dW
@@ -69,13 +69,23 @@ class LoRA(nn.Module):
         return lora_layer
 
     def forward(self, inputs):
-        #TODO: 这个forward还有问题，等会看看
         if isinstance(inputs, dict):
             # 输入可能是一个字典，包括input_ids, attention_mask, labels 有的模型可能没有labels
             # inputs = {k: v.to(self.model.device) if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
             return self.model(**inputs)
         else:
             return self.model(inputs)
+
+    def save_lora_modules(self, save_path):
+        os.makedirs(save_path, exist_ok=True)
+        lora_state_dict = {name: module.state_dict() for name, module in self.lora_layers.items()}
+        torch.save(lora_state_dict, os.path.join(save_path, "lora_modules.pth"))
+
+    def load_lora_modules(self, save_path):
+        lora_state_dict = torch.load(os.path.join(save_path, "lora_modules.pth"))
+        for name, module in self.lora_layers.items():
+            module.load_state_dict(lora_state_dict[name])
+
 
 def count_trainable_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -92,7 +102,7 @@ if __name__ == "__main__":
         model=model,
         r=8,
         lora_alpha=16,
-        target_modules=["encoder.layer.0.attention.self.query", "encoder.layer.0.attention.self.key"],
+        target_modules=["query", "key"],
         lora_dropout=0.1,
         bias="none"
     )
@@ -102,9 +112,9 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(device)
     lora_model.to(device)
-    #print("lora number of parameters: {}".format(count_trainable_parameters(lora_model)))
+    print("lora number of parameters: {}".format(count_trainable_parameters(lora_model)))
 
-    for epoch in range(3):
+    for epoch in range(1):
         lora_model.train()
         for batch in train_loader:
             optimizer.zero_grad()
@@ -118,3 +128,26 @@ if __name__ == "__main__":
             optimizer.step()
             scheduler.step()
             print(f"Epoch {epoch}, Loss: {loss.item()}")
+            break
+
+    lora_model.save_lora_modules("./lora_modules_test")
+
+    print("start loading and testing")
+    lora_model.load_lora_modules("./lora_modules_test")
+
+    for epoch in range(1):
+        lora_model.train()
+        for batch in train_loader:
+            optimizer.zero_grad()
+            inputs = {k: v.to(device) for k, v in batch.items()}
+            # output = model(**inputs)
+            # print(output)
+            # break
+            outputs = lora_model(inputs)
+            loss = outputs.loss
+            loss.backward()
+            optimizer.step()
+            scheduler.step()
+            print(f"Epoch {epoch}, Loss: {loss.item()}")
+            break
+

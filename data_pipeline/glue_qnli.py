@@ -1,6 +1,6 @@
 import torch
 from datasets import load_dataset
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader,Subset
 from transformers import AutoTokenizer, DataCollatorWithPadding
 from data_pipeline.common_fc import load_tokenizer_from_huggingface, load_dataset_from_huggingface
 
@@ -58,7 +58,7 @@ def build_dataloaders(dataset, tokenizer, max_length=256, batch_size=32, **kwarg
                                                 data_collator=data_collator)
     return train_loader, val_loader, test_loader
 
-def auto_get_glue_qnli_loaders():
+def auto_get_glue_qnli_loaders(num_samples = None):
     dataset = load_dataset_from_huggingface("nyu-mll/glue", "qnli")
     tokenizer = load_tokenizer_from_huggingface("bert-base-uncased")
     max_length = 256
@@ -66,6 +66,7 @@ def auto_get_glue_qnli_loaders():
     train_loader, val_loader, test_loader = build_dataloaders(
         dataset, tokenizer,max_length, batch_size
     )
+
     return train_loader, val_loader, test_loader
 
 
