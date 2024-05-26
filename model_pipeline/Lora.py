@@ -81,8 +81,8 @@ class LoRA(nn.Module):
         lora_state_dict = {name: module.state_dict() for name, module in self.lora_layers.items()}
         torch.save(lora_state_dict, os.path.join(save_path, "lora_modules.pth"))
 
-    def load_lora_modules(self, save_path):
-        lora_state_dict = torch.load(os.path.join(save_path, "lora_modules.pth"))
+    def load_lora_modules(self, lora_state_dict):
+        # lora_state_dict = torch.load(os.path.join(save_path, "lora_modules.pth"))
         for name, module in self.lora_layers.items():
             module.load_state_dict(lora_state_dict[name])
 
@@ -133,7 +133,8 @@ if __name__ == "__main__":
     lora_model.save_lora_modules("./lora_modules_test")
 
     print("start loading and testing")
-    lora_model.load_lora_modules("./lora_modules_test")
+    lora_state_dict = torch.load(os.path.join("./lora_modules_test", "lora_modules.pth"))
+    lora_model.load_lora_modules(lora_state_dict)
 
     for epoch in range(1):
         lora_model.train()

@@ -88,6 +88,8 @@ class Trainer:
                 # torch.save(self.model.state_dict(), self.config['save_path'])
                 self._log(f'Saved Best Model with Accuracy: {best_accuracy:.4f}')
 
+        return self.model
+
     def evaluate(self):
         # 根据task type计算不同的损失，task_type = classification / seq2seq
         self.model.eval()
@@ -111,18 +113,34 @@ class Trainer:
         return accuracy
 
     def save_checkpoint(self, epoch, metric):
+        #TODO: 需要测试模块
         checkpoint_path = os.path.join(self.config['checkpoint_dir'], f"checkpoint_epoch_{epoch}_metric_{metric:.4f}.pt")
-        torch.save({
-            'epoch': epoch,
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': self.optimizer.state_dict(),
-            'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
-            'metric': metric
-        }, checkpoint_path)
+        if isinstance(self.model, LoRA):
+            checkpoint = {
+                'epoch': epoch,
+                #'model_state_dict': self.model.model.state_dict(),  # Save base model state_dict
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
+                'metric': metric,
+                'lora_state_dict': {name: module.state_dict() for name, module in self.model.lora_layers.items()}
+                # Save LoRA layers state_dict
+            }
+            torch.save(checkpoint, checkpoint_path)
+        else:
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': self.model.state_dict(),
+                'optimizer_state_dict': self.optimizer.state_dict(),
+                'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
+                'metric': metric
+            }, checkpoint_path)
 
     def load_checkpoint(self, checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+        if isinstance(self.model, LoRA):
+            self.model.load_lora_modules(checkpoint['lora_state_dict'])  # Load LoRA layers state_dict
+        else:
+            self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if self.scheduler:
             self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
@@ -164,7 +182,7 @@ class Seq2SeqTrainer(Trainer):
 
 
 if __name__ == '__main__':
-    from transformers import BertForSequenceClassification, BertTokenizer, AutoModelForSequenceClassification
+    from transformers import AutoModelForSequenceClassification
     from data_pipeline.glue_qnli import auto_get_glue_qnli_loaders
 
     train_loader, val_loader, test_loader = auto_get_glue_qnli_loaders()
