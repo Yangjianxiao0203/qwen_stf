@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
     train_loader, _, test_loader = auto_get_glue_qnli_loaders()
     model = AutoModelForSequenceClassification.from_pretrained('bert-base-uncased')
-    print("Original Number of parameters: {}".format(count_trainable_parameters(model)))
+    #print("Original Number of parameters: {}".format(count_trainable_parameters(model)))
     lora_model = LoRA(
         model=model,
         r=8,
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(device)
     lora_model.to(device)
-    print("lora number of parameters: {}".format(count_trainable_parameters(lora_model)))
+    #print("lora number of parameters: {}".format(count_trainable_parameters(lora_model)))
 
     for epoch in range(3):
         lora_model.train()
@@ -112,7 +112,7 @@ if __name__ == "__main__":
             # output = model(**inputs)
             # print(output)
             # break
-            outputs = lora_model(**inputs)
+            outputs = lora_model(inputs)
             loss = outputs.loss
             loss.backward()
             optimizer.step()
