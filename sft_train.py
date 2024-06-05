@@ -10,8 +10,8 @@ dataset = load_dataset("/root/autodl-tmp/data/alpaca-data-gpt4-chinese")
 model_name = "/root/autodl-tmp/models/Llama3-8B-Chinese-Chat"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 # 加载预训练的模型
-model = AutoModelForCausalLM.from_pretrained(model_name)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # model.to(device)
 for name, layer in model.named_modules():
     print(f"Layer name: {name}, Layer type: {layer.__class__.__name__}")
@@ -35,10 +35,10 @@ lora_config = LoraConfig(
 
 model = get_peft_model(model, lora_config)
 
-# def collate_fn(batch):
-#     inputs = tokenizer([x["text"] for x in batch], padding=True, truncation=True, return_tensors="pt")
-#     inputs = {k: v.to(device) for k, v in inputs.items()}
-#     return inputs
+def collate_fn(batch):
+    inputs = tokenizer([x["text"] for x in batch], padding=True, truncation=True, return_tensors="pt")
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+    return inputs
 
 training_args = TrainingArguments(
     output_dir="./results",
@@ -48,7 +48,8 @@ training_args = TrainingArguments(
     gradient_accumulation_steps=8, 
     num_train_epochs=3,
     deepspeed="ds_config.json",
-    fp16=True
+    fp16=True,
+    report_to="none"
 )
 # 创建trainer
 trainer = SFTTrainer(
