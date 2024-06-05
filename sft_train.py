@@ -11,7 +11,7 @@ model_name = "/root/autodl-tmp/models/Llama3-8B-Chinese-Chat"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 # 加载预训练的模型
 model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # model.to(device)
 for name, layer in model.named_modules():
     print(f"Layer name: {name}, Layer type: {layer.__class__.__name__}")
@@ -40,11 +40,18 @@ def collate_fn(batch):
     inputs = {k: v.to(device) for k, v in inputs.items()}
     return inputs
 
+total_params = sum(p.numel() for p in model.parameters())
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+print(f"Total parameters: {total_params}")
+print(f"Trainable parameters: {trainable_params}")
+
+
 training_args = TrainingArguments(
     output_dir="./results",
     evaluation_strategy="epoch",
     learning_rate=2e-5,
-    per_device_train_batch_size=4, 
+    per_device_train_batch_size=2, 
     gradient_accumulation_steps=8, 
     num_train_epochs=3,
     deepspeed="ds_config.json",
