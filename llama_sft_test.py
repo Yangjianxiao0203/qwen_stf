@@ -8,21 +8,24 @@ from peft import LoraConfig, TaskType, get_peft_model
 
 # sft: 2-5 epoch, wandb
 
+MAX_LENGTH = 612   
+
 dataset = load_dataset("/root/autodl-tmp/code/test_data/alpaca-data-gpt4-chinese")
-dataset = dataset["train"]
+dataset = dataset["train"].select(range(10000))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 tokenizer = AutoTokenizer.from_pretrained('/root/autodl-tmp/models/LLM-Research/Meta-Llama-3-8B-Instruct', use_fast=False, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.eos_token
 
 def process_func(example):
-    MAX_LENGTH = 612    # Llama分词器会将一个中文字切分为多个token，因此需要放开一些最大长度，保证数据的完整性
+     # Llama分词器会将一个中文字切分为多个token，因此需要放开一些最大长度，保证数据的完整性
     input_ids, attention_mask, labels = [], [], []
     instruction = tokenizer(f"<|start_header_id|>user<|end_header_id|>\n\n{example['instruction_zh'] + example['input_zh']}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n", add_special_tokens=False)
     response = tokenizer(f"{example['output']}<|eot_id|>", add_special_tokens=False)
     input_ids = instruction["input_ids"] + response["input_ids"] + [tokenizer.pad_token_id]
     attention_mask = instruction["attention_mask"] + response["attention_mask"] + [1]  # 因为eos token咱们也是要关注的所以 补充为1
     labels = [-100] * len(instruction["input_ids"]) + response["input_ids"] + [tokenizer.pad_token_id]  
+    
     if len(input_ids) > MAX_LENGTH:
         input_ids = input_ids[:MAX_LENGTH]
         attention_mask = attention_mask[:MAX_LENGTH]
@@ -32,7 +35,7 @@ def process_func(example):
         input_ids = input_ids + [tokenizer.pad_token_id] * padding_length
         attention_mask = attention_mask + [0] * padding_length  
         labels = labels + [-100] * padding_length  
-
+    
     # Ensure lengths are consistent
     assert len(input_ids) == MAX_LENGTH, "input_ids length not equal to MAX_LENGTH"
     assert len(attention_mask) == MAX_LENGTH, "input_ids length not equal to MAX_LENGTH"
@@ -45,8 +48,14 @@ def process_func(example):
     }
 
 
+
 # 预处理数据集
-tokenized_dataset = dataset.map(process_func, batched=True)
+tokenized_dataset = dataset.map(process_func, batched=False,remove_columns=dataset.column_names)
+
+# for i in tokenized_dataset:
+#     print(i)
+#     print("*" * 100)
+#     break
 
 def collate_fn(batch):
     inputs = tokenizer([x["text"] for x in batch], padding=True, truncation=True, return_tensors="pt")
