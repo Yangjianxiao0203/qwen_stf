@@ -5,14 +5,17 @@ from peft import get_peft_model, LoraConfig
 import torch
 
 dataset = load_dataset("/root/autodl-tmp/data/alpaca-data-gpt4-chinese")
+# dataset = {split: subset.select(range(min(10000, len(subset)))) for split, subset in dataset.items()}
 
 # 加载预训练的tokenizer
 model_name = "/root/autodl-tmp/models/Llama3-8B-Chinese-Chat"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False, trust_remote_code=True)
 # 加载预训练的模型
+# model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
 model = AutoModelForCausalLM.from_pretrained(model_name, device_map="auto")
+model.enable_input_require_grads() 
+# model.config.use_cache = False
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# model.to(device)
 for name, layer in model.named_modules():
     print(f"Layer name: {name}, Layer type: {layer.__class__.__name__}")
 
@@ -26,7 +29,7 @@ def preprocess_function(examples):
 tokenized_dataset = dataset.map(preprocess_function, batched=True)
 
 lora_config = LoraConfig(
-    r=2,
+    r=6,
     lora_alpha=16,
     target_modules=["q_proj", "v_proj"],  # 根据模型结构调整
     lora_dropout=0.1,
@@ -54,9 +57,11 @@ training_args = TrainingArguments(
     per_device_train_batch_size=2, 
     gradient_accumulation_steps=8, 
     num_train_epochs=3,
-    deepspeed="ds_config.json",
+    # deepspeed="ds_config.json",
     fp16=True,
-    report_to="none"
+    report_to="none",
+    save_on_each_node=True,
+    gradient_checkpointing=True
 )
 # 创建trainer
 trainer = SFTTrainer(
