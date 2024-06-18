@@ -6,3 +6,5 @@ peft
 deepspeed
 wandb
 trl
+modelscope
+uvicorn
