@@ -13,14 +13,15 @@ wandb.init(mode="offline", project="llama_sft")
 
 MAX_LENGTH = 612   
 
-dataset = load_dataset("/root/autodl-tmp/code/test_data/alpaca-data-gpt4-chinese")
+dataset = load_dataset("/root/autodl-tmp/data/alpaca-data-gpt4-chinese")
 
 all_dataset = dataset['train'].select(range(10000))
+#all_dataset = dataset['train']
 columns_to_remove = ['instruction_zh', 'input_zh', 'output', 'input', 'output_zh','instruction']
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-tokenizer = AutoTokenizer.from_pretrained('/root/autodl-tmp/models/LLM-Research/Meta-Llama-3-8B-Instruct', use_fast=False, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained('/root/autodl-tmp/models/Meta-Llama-3-8B/LLM-Research/Meta-Llama-3-8B', use_fast=False, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.eos_token
 
 def process_func(example):
@@ -66,13 +67,18 @@ train_dataset = split_dataset["train"]
 for i in train_dataset:
     print(i)
     break
+print("test_dataset",len(test_dataset))
+for i in test_dataset:
+    print("test dataset")
+    print(i)
+    break
 
 def collate_fn(batch):
     inputs = tokenizer([x["text"] for x in batch], padding=True, truncation=True, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
     return inputs
 
-model = AutoModelForCausalLM.from_pretrained('/root/autodl-tmp/models/LLM-Research/Meta-Llama-3-8B-Instruct', device_map="auto",torch_dtype=torch.bfloat16)
+model = AutoModelForCausalLM.from_pretrained('/root/autodl-tmp/models/Meta-Llama-3-8B/LLM-Research/Meta-Llama-3-8B', device_map="auto",torch_dtype=torch.bfloat16)
 model.enable_input_require_grads() 
 config = LoraConfig(
     task_type=TaskType.CAUSAL_LM, 
@@ -106,7 +112,7 @@ def compute_metrics(eval_pred):
 
     # Combine results
     result = {"bleu": bleu_score, **rouge_result}
-
+    print("result: ",result)
     # Optional: Add additional metrics if needed
     # Example: Perplexity
     # cross_entropy_loss = torch.nn.CrossEntropyLoss()(torch.tensor(predictions), torch.tensor(labels))
