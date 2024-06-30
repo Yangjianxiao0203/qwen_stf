@@ -12,5 +12,14 @@ def download_meta_llama_3_8b():
 
     print(f"Model {model_id} has been downloaded to {target_dir}")
 
+def modelscope_download_model(model_name,target_dir="/root"):
+    cache_dir = os.path.join(target_dir, model_name)
+    resp = snapshot_download(model_name, cache_dir=cache_dir)
+    print(f"Model {model_name} has been downloaded to {resp}")
+    return resp
+
 if __name__ == "__main__":
-    download_meta_llama_3_8b()
+    # download_meta_llama_3_8b()
+    target_dir = "C:\jianxiao_codes\python\models"
+    cache_file = modelscope_download_model("qwen/Qwen2-0.5B",target_dir)
+    print(cache_file)

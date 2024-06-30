@@ -1,7 +1,7 @@
 import torch
 from datasets import load_dataset,DatasetDict,Dataset
 from modelscope import snapshot_download
-from trl import SFTTrainer
+# from trl import SFTTrainer
 from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorForSeq2Seq, TrainingArguments, Trainer, GenerationConfig
 import os
 from peft import LoraConfig, TaskType, get_peft_model
