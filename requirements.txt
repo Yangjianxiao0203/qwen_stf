@@ -2,6 +2,8 @@ transformers
 accelerate
 torch
 datasets
+scikit-learn
+evaluate
 # mpi4py
 peft
 deepspeed
