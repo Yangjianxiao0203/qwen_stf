@@ -11,3 +11,6 @@ wandb
 trl
 modelscope
 uvicorn
+
+#evaluation
+git+https://github.com/EleutherAI/lm-evaluation-harness.git

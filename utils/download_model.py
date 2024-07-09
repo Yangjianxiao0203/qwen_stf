@@ -20,6 +20,6 @@ def modelscope_download_model(model_name,target_dir="/root"):
 
 if __name__ == "__main__":
     # download_meta_llama_3_8b()
-    target_dir = "C:\jianxiao_codes\python\models"
+    target_dir = "/root/autodl-tmp/models"
     cache_file = modelscope_download_model("qwen/Qwen2-0.5B",target_dir)
     print(cache_file)

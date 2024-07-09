@@ -11,11 +11,11 @@ wandb.init(mode="offline", project="llama_sft")
 
 # sft: 2-5 epoch, wandb
 
-MAX_LENGTH = 612   
+MAX_LENGTH = 1024   
 
 dataset = load_dataset("/root/autodl-tmp/data/alpaca-data-gpt4-chinese")
 
-all_dataset = dataset['train'].select(range(10000))
+all_dataset = dataset['train'].select(range(8000))
 #all_dataset = dataset['train']
 columns_to_remove = ['instruction_zh', 'input_zh', 'output', 'input', 'output_zh','instruction']
 
@@ -55,23 +55,15 @@ def process_func(example):
 
 # 预处理数据集
 tokenized_dataset = all_dataset.map(process_func, batched=False,remove_columns=columns_to_remove)
-for i in tokenized_dataset:
-    print(i)
-    print("*" * 100)
-    break
+# for i in tokenized_dataset:
+#     print(i)
+#     print("*" * 100)
+#     break
 
 split_dataset = tokenized_dataset.train_test_split(test_size=0.1)
-print(split_dataset)
+# print(split_dataset)
 test_dataset = split_dataset["test"]
 train_dataset = split_dataset["train"]
-for i in train_dataset:
-    print(i)
-    break
-print("test_dataset",len(test_dataset))
-for i in test_dataset:
-    print("test dataset")
-    print(i)
-    break
 
 def collate_fn(batch):
     inputs = tokenizer([x["text"] for x in batch], padding=True, truncation=True, return_tensors="pt")
@@ -85,7 +77,7 @@ config = LoraConfig(
     target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     inference_mode=False, 
     r=8, 
-    lora_alpha=32, 
+    lora_alpha=16, 
     lora_dropout=0.1
 )
 
@@ -126,22 +118,23 @@ args = TrainingArguments(
     per_device_train_batch_size=8,
     gradient_accumulation_steps=4,
     logging_steps=10,
-    num_train_epochs=1,
-    save_steps=100,
+    num_train_epochs=3,
+    save_steps=50,
     learning_rate=1e-4,
+    weight_decay=0.01,  # 默认参数
+    warmup_steps=int(0.5 * (len(tokenized_dataset) // (8 * 4))),  # 半个 epoch
     save_on_each_node=True,
     gradient_checkpointing=True,
-    logging_dir="./logs",
-    report_to="wandb",  # Report to wandb
+    report_to="wandb",
 )
 
 trainer = Trainer(
     model=model,
     args=args,
     train_dataset=train_dataset,
-    eval_dataset=test_dataset,
+    # eval_dataset=test_dataset,
     data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer, padding=True),
-    compute_metrics=compute_metrics
+    # compute_metrics=compute_metrics
 )
 
 trainer.train()

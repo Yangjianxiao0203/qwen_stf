@@ -8,13 +8,13 @@ from peft import LoraConfig, TaskType, get_peft_model
 
 # sft: 2-5 epoch, wandb
 
-MAX_LENGTH = 612   
+MAX_LENGTH = 1024 
 
-dataset = load_dataset("/root/autodl-tmp/code/test_data/alpaca-data-gpt4-chinese")
-dataset = dataset["train"].select(range(10000))
+dataset = load_dataset("/root/autodl-tmp/data/alpaca-data-gpt4-chinese")
+dataset = dataset["train"].select(range(2000))
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-tokenizer = AutoTokenizer.from_pretrained('/root/autodl-tmp/models/LLM-Research/Meta-Llama-3-8B-Instruct', use_fast=False, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained('/root/autodl-tmp/models/Meta-Llama-3-8B/LLM-Research/Meta-Llama-3-8B', use_fast=False, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.eos_token
 
 def process_func(example):
@@ -52,17 +52,13 @@ def process_func(example):
 # 预处理数据集
 tokenized_dataset = dataset.map(process_func, batched=False,remove_columns=dataset.column_names)
 
-# for i in tokenized_dataset:
-#     print(i)
-#     print("*" * 100)
-#     break
 
 def collate_fn(batch):
     inputs = tokenizer([x["text"] for x in batch], padding=True, truncation=True, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
     return inputs
 
-model = AutoModelForCausalLM.from_pretrained('/root/autodl-tmp/models/LLM-Research/Meta-Llama-3-8B-Instruct', device_map="auto",torch_dtype=torch.bfloat16)
+model = AutoModelForCausalLM.from_pretrained('/root/autodl-tmp/models/Meta-Llama-3-8B/LLM-Research/Meta-Llama-3-8B', device_map="auto",torch_dtype=torch.bfloat16)
 model.enable_input_require_grads() 
 config = LoraConfig(
     task_type=TaskType.CAUSAL_LM, 
@@ -97,4 +93,4 @@ trainer = Trainer(
     data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer, padding=True),
 )
 
-trainer.train()
+trainer.train(resume_from_checkpoint=True)
