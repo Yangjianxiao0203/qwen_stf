@@ -137,4 +137,4 @@ trainer = Trainer(
     # compute_metrics=compute_metrics
 )
 
-trainer.train()
+trainer.train(resume_from_checkpoint=True)

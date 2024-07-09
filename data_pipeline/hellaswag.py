@@ -1,77 +1,58 @@
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
-from accelerate import Accelerator
-from transformers import AutoTokenizer
 
-accelerator = Accelerator()
+def evaluate_hellaswag(model, tokenizer, device, dataset_split="validation"):
+    # 加载 HellaSwag 数据集
+    dataset = load_dataset("hellaswag", split=dataset_split)
 
-'''
-TODO：hellaswag 评测数据集都是怎么构建的，具体如何评估模型能力，是看困惑度还是准确度, 是训练中使用，还是训练后单独评估
-'''
+    dataset = dataset.select(range(200))
 
-def process(single_data, tokenizer, max_length=128):
-    '''
-    数据处理流程：
-    1. 把prompt（source） 和 输出 output（target）拼接在一起，作为同一个input ids
-    2. labels复制这个input ids，然后把prompt部分的input ids设置为-100，output的部分还是保持原来的
-    3.设置attention masks，input ids中把padding的部分都设置为0，其他都是1
-    '''
+    # 评估指标初始化
+    total = 0
+    correct = 0
 
-    MAX_LENGTH = max_length
-    prompt_template = """
-    Below is an instruction that describes a task. Write a response that appropriately completes the request.
+    for example in dataset:
+        context = example["ctx"]
+        endings = example["endings"]
+        label = int(example["label"])
 
-    ### Instruction:
-    {instruction}
+        # 编码上下文
+        input_ids = tokenizer.encode(context, return_tensors="pt").to(device)
 
-    {input_formatter}
+        # 对每个结尾进行评分
+        scores = []
+        for ending in endings:
+            input_text = context + " " + ending
+            input_ids = tokenizer.encode(input_text, return_tensors="pt").to(device)
 
-    ### Response:
-    """
-    input_formatter = ""
-    if single_data["input"] and len(single_data["input"]) > 0:
-        input_formatter = f"###Input:\n{single_data['input']}"
+            # 进行推理
+            with torch.no_grad():
+                outputs = model(input_ids, labels=input_ids)
+                loss = outputs.loss.item()  # 获取损失值
 
-    prompt = prompt_template.format(instruction=single_data["instruction"], input_formatter=input_formatter)
-    tokenized_prompt = tokenizer(prompt, add_special_tokens=False)
-    tokenized_response = tokenizer(single_data["output"], add_special_tokens=False)
+            scores.append(loss)
 
-    # 注意： attention mask代表需要注意力机制看到的部分，所以eos token也是需要关注的，所以attention mask补充为1
-    input_ids = tokenized_prompt["input_ids"] + tokenized_response["input_ids"] + [tokenizer.pad_token_id]
-    attention_mask = tokenized_prompt["attention_mask"] + tokenized_response["attention_mask"] + [1]
-    labels = [-100] * len(tokenized_prompt["input_ids"]) + tokenized_response["input_ids"] + [tokenizer.pad_token_id]
+        # 选择损失最低的结尾
+        predicted_label = torch.argmin(torch.tensor(scores)).item()
 
-    if len(input_ids) > MAX_LENGTH:
-        input_ids = input_ids[:MAX_LENGTH]
-        attention_mask = attention_mask[:MAX_LENGTH]
-        labels = labels[:MAX_LENGTH]
-    else:
-        padding_length = MAX_LENGTH - len(input_ids)
-        input_ids = input_ids + [tokenizer.pad_token_id] * padding_length
-        attention_mask = attention_mask + [0] * padding_length
-        labels = labels + [-100] * padding_length
+        print(f"correct label: {label}, predicted label: {predicted_label}")
 
-    assert len(input_ids) == MAX_LENGTH, "input_ids length not equal to MAX_LENGTH"
-    assert len(attention_mask) == MAX_LENGTH, "input_ids length not equal to MAX_LENGTH"
-    assert len(labels) == MAX_LENGTH, "input_ids length not equal to MAX_LENGTH"
+        # 计算准确率
+        if predicted_label == label:
+            correct += 1
+        total += 1
 
-    return {
-        "input_ids": input_ids,
-        "attention_mask": attention_mask,
-        "labels": labels
-    }
-
-def build_hellaswag_data(tokenizer, data_dir = "Rowan/hellaswag", size = None,max_length=128):
-    dataset = load_dataset(data_dir)
-    if size:
-        dataset = dataset["val"].select(range(size))
-    else:
-        dataset = dataset["val"]
-    processed_dataset = dataset.map(lambda x: process(x, tokenizer,max_length=max_length), batched=False,remove_columns=dataset.column_names)
-    return processed_dataset
+    accuracy = correct / total
+    return accuracy
 
 if __name__ == "__main__":
-    tokenizer = AutoTokenizer.from_pretrained("C:\jianxiao_codes\python\models\qwen/Qwen2-0.5B\qwen\Qwen2-0___5B")
-    dataset = build_hellaswag_data(tokenizer)
-    for i in dataset:
-        print(i)
-        break
+    # 加载模型
+    model_path = "C:\jianxiao_codes\python\models\qwen/Qwen2-0.5B\qwen\Qwen2-0___5B"
+    model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype="auto", device_map="auto")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+
+    # 评估模型
+    accuracy = evaluate_hellaswag(model, tokenizer, device)
+    print(f"Accuracy: {accuracy}")
