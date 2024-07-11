@@ -138,3 +138,7 @@ trainer = Trainer(
 )
 
 trainer.train(resume_from_checkpoint=True)
+
+model_save_path = "./output/llama3/final_model"
+trainer.save_model(model_save_path)
+tokenizer.save_pretrained(model_save_path)

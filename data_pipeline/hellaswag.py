@@ -48,7 +48,8 @@ def evaluate_hellaswag(model, tokenizer, device, dataset_split="validation"):
 
 if __name__ == "__main__":
     # 加载模型
-    model_path = "C:\jianxiao_codes\python\models\qwen/Qwen2-0.5B\qwen\Qwen2-0___5B"
+    # model_path = "C:\jianxiao_codes\python\models\qwen/Qwen2-0.5B\qwen\Qwen2-0___5B"
+    model_path = "/root/autodl-tmp/models/Meta-Llama-3-8B/LLM-Research/Meta-Llama-3-8B"
     model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype="auto", device_map="auto")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     tokenizer = AutoTokenizer.from_pretrained(model_path)
