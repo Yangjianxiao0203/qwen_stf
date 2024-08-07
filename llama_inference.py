@@ -10,7 +10,9 @@ model = AutoModelForCausalLM.from_pretrained(base_model_name)
 model = PeftModel.from_pretrained(model, adapter_model_name).to(device)
 
 tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-
-inputs = tokenizer.encode("This movie was really", return_tensors="pt").to(device)
-outputs = model.generate(inputs)
+input_text = "this movie is very"
+print(f"start asking {input_text}")
+input_ids = tokenizer.encode(input_text, return_tensors="pt").to(device)
+with torch.no_grad():
+    outputs = model.generate(input_ids, max_length=256, pad_token_id=tokenizer.eos_token_id, temperature=0.1)
 print(tokenizer.decode(outputs[0]))
