@@ -15,4 +15,5 @@ print(f"start asking {input_text}")
 input_ids = tokenizer.encode(input_text, return_tensors="pt").to(device)
 with torch.no_grad():
     outputs = model.generate(input_ids, max_length=256, pad_token_id=tokenizer.eos_token_id, temperature=0.1)
-print(tokenizer.decode(outputs[0]))
+
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))
