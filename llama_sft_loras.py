@@ -10,6 +10,8 @@ import os
 from peft import LoraConfig, TaskType, get_peft_model
 import wandb
 
+#TODO: 创建一个github私钥，然后用ssh clone和推送代码
+
 # 设置日志文件
 logging.basicConfig(filename='training_log.txt', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -91,9 +93,9 @@ def train(lora_num):
         output_dir=f"./output/llama3/r_{lora_num}",
         per_device_train_batch_size=8,
         gradient_accumulation_steps=4,
-        logging_steps=1,
+        logging_steps=3,
         num_train_epochs=3,
-        save_steps=50,
+        save_steps=200,
         learning_rate=1e-4,
         weight_decay=0.01,  # 默认参数
         warmup_steps=int(0.5 * (len(tokenized_dataset) // (8 * 4))),
@@ -141,4 +143,5 @@ def train(lora_num):
 if __name__ == '__main__':
     loras = [2,4,8,12,16]
     for lora_num in loras:
+        print(f"current processing r={lora_num}")
         train(lora_num)
