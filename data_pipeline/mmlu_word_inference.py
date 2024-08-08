@@ -3,6 +3,11 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 
+"""
+mmlu 采用cais/mmlu，huggingface上 all中有116k数据
+这里面有源码构建：https://github.com/openai/evals/blob/main/examples/mmlu.ipynb
+"""
+
 def load_mmlu_data(data_path, dataset_split="train", sample_size=200):
     """
     加载并预处理 MMLU 数据集
@@ -13,6 +18,19 @@ def load_mmlu_data(data_path, dataset_split="train", sample_size=200):
     # # 选择子集进行测试
     # dataset = dataset.select(range(sample_size))
     return dataset
+
+def create_mmlu_prompt(context, choices):
+    """
+    构建成这种形式的格式 <|start_header_id|>user<|end_header_id|>\n\n{example['instruction_zh'] + example['input_zh']}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    """
+    prompt = """
+    <|start_header_id|>user<|end_header_id|>{}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    """
+    indexs = ["A", "B", "C", "D"]
+    user_prompt = f"{context}\n" + "\n".join([f"{index}. {choice}" for index, choice in zip(indexs,choices)])
+    prompt = prompt.format(user_prompt)
+
+    return prompt
 
 def evaluate_mmlu(model, tokenizer, device, dataset):
     """
@@ -31,13 +49,15 @@ def evaluate_mmlu(model, tokenizer, device, dataset):
         input_text = f"{context}\n"
         for i, choice in enumerate(choices):
             input_text += f"{i + 1}. {choice}\n"
-        input_text += "Please provide your answer after #answer: \n#answer:"
+        input_text += """
+        Please provide your answer after #answer: \n#answer:
+        """
 
         input_ids = tokenizer.encode(input_text, return_tensors="pt").to(device)
 
         # 生成预测
         with torch.no_grad():
-            outputs = model.generate(input_ids, max_length=512, pad_token_id=tokenizer.eos_token_id,temperature=0.1)
+            outputs = model.generate(input_ids, max_length=256, pad_token_id=tokenizer.eos_token_id,temperature=0.1)
         
         # 解码生成的文本
         generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)

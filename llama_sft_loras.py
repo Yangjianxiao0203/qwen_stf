@@ -141,7 +141,7 @@ def train(lora_num):
     tokenizer.save_pretrained(model_save_path)
 
 if __name__ == '__main__':
-    loras = [2,4,8,12,16]
+    loras = [2,4,8,12,16,32,64]
     for lora_num in loras:
         print(f"current processing r={lora_num}")
         train(lora_num)

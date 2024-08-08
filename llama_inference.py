@@ -3,6 +3,9 @@ from peft import PeftConfig, PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 base_model_name = "/root/autodl-tmp/models/Meta-Llama-3-8B/LLM-Research/Meta-Llama-3-8B"
+'''
+只需要存final models文件夹就可以了，checkpoint文件夹不需要
+'''
 adapter_model_name = "./output/llama3/final_model"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
