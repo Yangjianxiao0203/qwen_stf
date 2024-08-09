@@ -3,7 +3,7 @@ import torch
 from peft import PeftModel
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
-
+import json
 
 def load_mmlu_data(data_path, dataset_split="train", sample_size=200):
     """
@@ -111,14 +111,14 @@ def check_answer(answer, correct_label):
     else:
         return False
 
-def main():
+def main(model_lora_path):
     data_path = {
-        "validation": "/root/autodl-tmp/data/mmlu/all/validation-00000-of-00001.parquet"
+        "validation": "/root/autodl-tmp/data/mmlu/all/validation-00000-of-00001.parquet" #1530 rows
     }
     dataset = load_mmlu_data(data_path["validation"])
     # prompt, label = form_prompt(dataset)
     data = form_prompts(dataset)
-    model_lora_path = "./output/llama3/final_model_r_8"
+    # model_lora_path = "./output/llama3/final_model_r_8"
     model, tokenizer, device = load_model(model_lora_path)
     correct = 0
     index = 1
@@ -133,7 +133,28 @@ def main():
     print(f"correct: {correct}, total: {len(data)}")
     accuracy = correct / len(data)
     print(f"accuracy: {accuracy}")
+    result = {
+        "model" : model_lora_path,
+        "correct": correct,
+        "total": len(data),
+        "accuracy": accuracy
+    }
+    #存到json
+    with open(f"mmlu_result.jsonl", "a+") as f:
+        f.write(json.dumps(result) + "\n")
 
 
 if __name__ == "__main__":
-    main()
+    model_lora_paths = [
+        "./output/llama3/final_model_r_2",
+        "./output/llama3/final_model_r_4",
+        "./output/llama3/final_model_r_8",
+        "./output/llama3/final_model_r_12",
+        "./output/llama3/final_model_r_16",
+        # "./output/llama3/final_model_r_32",
+    ]
+    for model_lora_path in model_lora_paths:
+        print("*" * 30)
+        print(f"model_lora_path: {model_lora_path}")
+        main(model_lora_path)
+        print("*" * 20)
