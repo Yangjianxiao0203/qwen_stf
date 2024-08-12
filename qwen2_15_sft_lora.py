@@ -100,7 +100,7 @@ def train(lora_num):
         gradient_accumulation_steps=4,
         logging_steps=3,
         num_train_epochs=3,
-        save_steps=200,
+        save_steps=600,
         learning_rate=1e-5,
         weight_decay=0.01,  # 默认参数
         warmup_steps=int(0.5 * (len(tokenized_dataset) // (8 * 4))),
