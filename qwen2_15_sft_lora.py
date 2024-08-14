@@ -4,13 +4,11 @@ import logging
 import torch
 from datasets import load_dataset, load_metric
 from modelscope import snapshot_download
+from swanlab.integration.huggingface import SwanLabCallback
 from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorForSeq2Seq, TrainingArguments, Trainer, \
     GenerationConfig, TrainerCallback
 import os
 from peft import LoraConfig, TaskType, get_peft_model
-import wandb
-
-#TODO: 创建一个github私钥，然后用ssh clone和推送代码
 
 # 设置日志文件
 logging.basicConfig(filename='training_log.txt', level=logging.INFO)
@@ -24,7 +22,7 @@ MAX_LENGTH = 256
 
 dataset = load_dataset("/root/autodl-tmp/data/alpaca-data-gpt4-chinese")
 model_path = "/root/autodl-tmp/models/qwen/Qwen2-1___5B"
-output_dir_prefix = "./output/qwen15"
+output_dir_prefix = "./output/qwen15-alpaca"
 
 #all_dataset = dataset['train'].select(range(500))
 all_dataset = dataset['train']
@@ -41,7 +39,7 @@ def process_func(example):
     # Llama分词器会将一个中文字切分为多个token，因此需要放开一些最大长度，保证数据的完整性
     input_ids, attention_mask, labels = [], [], []
     instruction = tokenizer \
-        (f"<|start_header_id|>user<|end_header_id|>\n\n{example['instruction_zh'] + example['input_zh']}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        (f"You are a very helpful assistant. Please Answer the following question: \n{example['instruction'] + example['input']}\n",
          add_special_tokens=False)
     response = tokenizer(f"{example['output']}<|eot_id|>", add_special_tokens=False)
     input_ids = instruction["input_ids"] + response["input_ids"] + [tokenizer.pad_token_id]
@@ -127,6 +125,15 @@ def train(lora_num):
                         f.write('\n')
                 except Exception as e:
                     pass
+    swanlab_callback = SwanLabCallback(
+        project="Qwen2-mmlu-fintune",
+        experiment_name=f"Qwen2-1.5B-Instruct-lora-alpaca-{lora_num}",
+        description="使用通义千问Qwen2-1.5B-Instruct模型在zh_cls_fudan-news数据集上微调。",
+        config={
+            "model": f"qwen/Qwen2-1.5B-Instruct-lora-{lora_num}",
+            "dataset": "mmlu",
+        }
+    )
 
     trainer = Trainer(
         model=model,
@@ -134,7 +141,7 @@ def train(lora_num):
         train_dataset=train_dataset,
         # eval_dataset=test_dataset,
         data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer, padding=True),
-        callbacks=[CustomLoggingCallback]
+        callbacks=[swanlab_callback]
         # compute_metrics=compute_metrics
     )
     try:
@@ -147,7 +154,7 @@ def train(lora_num):
     tokenizer.save_pretrained(model_save_path)
 
 if __name__ == '__main__':
-    loras = [2,4,8,12,16,32,64]
+    loras = [4,2,8,12,16,32,64]
     for lora_num in loras:
         print(f"current processing r={lora_num}")
         train(lora_num)

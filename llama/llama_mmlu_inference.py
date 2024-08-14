@@ -27,7 +27,7 @@ def create_mmlu_prompt(context, choices):
     <|im_start|>system\nsystem\nYou are an expert in the field of text classification. Please choose the most appropriate option from [A, B, C, D] based on the given context and output only one option, followed directly by "#Answer: " (e.g., "#Answer: A").<|im_end|>\n<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n
     """
     if base_model:
-        prompt = """You are an expert in the field of text classification. Please choose the most appropriate option from [A, B, C, D] based on the given context and output only one option, followed directly by "#Answer: " (e.g., "#Answer: A"). \n {}"""
+        prompt = """You are an expert in the field of text classification. Please choose the most appropriate option from [A, B, C, D] based on the given context and output only one option, followed directly by "#Answer: " (e.g., "#Answer: A"). You must choose an answer. \n {}"""
 
     indexs = ["A", "B", "C", "D"]
     user_prompt = f"{context}\n" + "\n".join(
