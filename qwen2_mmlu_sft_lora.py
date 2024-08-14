@@ -8,6 +8,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, DataCollatorForSeq
     GenerationConfig, TrainerCallback
 import os
 from peft import LoraConfig, TaskType, get_peft_model
+from swanlab.integration.huggingface import SwanLabCallback
 import wandb
 
 #TODO: 创建一个github私钥，然后用ssh clone和推送代码
@@ -22,13 +23,31 @@ logger = logging.getLogger(__name__)
 
 MAX_LENGTH = 256
 
-dataset = load_dataset("/root/autodl-tmp/data/alpaca-data-gpt4-chinese")
+def load_mmlu_data(data_path, dataset_split="train", sample_size=200):
+    """
+    加载并预处理 MMLU 数据集
+    """
+    # 加载数据集
+    dataset = load_dataset("parquet", data_files=data_path,split=dataset_split)
+
+    #print 其中一个数据
+    for example in dataset:
+        print(example)
+        break
+    #print 总leng
+    print(len(dataset))
+    print("*" * 20)
+    return dataset
+
+#
+dataset = load_mmlu_data("/root/autodl-tmp/data/mmlu/all/auxiliary_train-00000-of-00001.parquet")
+# dataset = load_mmlu_data("/root/autodl-tmp/data/mmlu/all/validation-00000-of-00001.parquet")
+
 model_path = "/root/autodl-tmp/models/qwen/Qwen2-1___5B"
 output_dir_prefix = "./output/qwen15"
 
 #all_dataset = dataset['train'].select(range(500))
-all_dataset = dataset['train']
-columns_to_remove = ['instruction_zh', 'input_zh', 'output', 'input', 'output_zh', 'instruction']
+all_dataset = dataset.select(range(20000))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -36,14 +55,15 @@ tokenizer = AutoTokenizer.from_pretrained(model_path,
                                           use_fast=False, trust_remote_code=True)
 tokenizer.pad_token = tokenizer.eos_token
 
-
 def process_func(example):
-    # Llama分词器会将一个中文字切分为多个token，因此需要放开一些最大长度，保证数据的完整性
-    input_ids, attention_mask, labels = [], [], []
-    instruction = tokenizer \
-        (f"<|start_header_id|>user<|end_header_id|>\n\n{example['instruction_zh'] + example['input_zh']}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
-         add_special_tokens=False)
-    response = tokenizer(f"{example['output']}<|eot_id|>", add_special_tokens=False)
+    context = example["question"]
+    choices = example["choices"]
+    label = int(example["answer"])
+    indexs = ["A", "B", "C", "D"]
+    prompt = create_mmlu_prompt(context, choices)
+    instruction = tokenizer(prompt, add_special_tokens=False)
+    response = tokenizer(f"#Answer: {indexs[label]}", add_special_tokens=False)
+
     input_ids = instruction["input_ids"] + response["input_ids"] + [tokenizer.pad_token_id]
     attention_mask = instruction["attention_mask"] + response["attention_mask"] + [1]  # 因为eos token咱们也是要关注的所以 补充为1
     labels = [-100] * len(instruction["input_ids"]) + response["input_ids"] + [tokenizer.pad_token_id]
@@ -68,6 +88,19 @@ def process_func(example):
         "labels": labels
     }
 
+def create_mmlu_prompt(context, choices):
+    """
+    构建成这种形式的格式 <|start_header_id|>user<|end_header_id|>\n\n{example['instruction_zh'] + example['input_zh']}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    """
+    prompt = """
+    You are an expert in the field of text classification. Please choose the most appropriate option from [A, B, C, D] based on the given context and output only one option, followed directly by "#Answer: " (e.g., "#Answer: A"). \n {}
+    """
+    indexs = ["A", "B", "C", "D"]
+    user_prompt = f"{context}\n" + "\n".join(
+        [f"{index}. {choice}" for index, choice in zip(indexs, choices)])
+    prompt = prompt.format(user_prompt)
+
+    return prompt
 
 def train(lora_num):
     # model_path = "/root/autodl-tmp/models/qwen/Qwen2-1___5B"
@@ -75,10 +108,11 @@ def train(lora_num):
     model_save_path = f"{output_dir_prefix}/final_model_r_{lora_num}"
 
     # 预处理数据集
-    tokenized_dataset = all_dataset.map(process_func, batched=False, remove_columns=columns_to_remove)
+    tokenized_dataset = all_dataset.map(process_func, batched=False)
     split_dataset = tokenized_dataset.train_test_split(test_size=0.1)
     test_dataset = split_dataset["test"]
     train_dataset = split_dataset["train"]
+    print("train_dataset length: ", len(train_dataset))
     model = AutoModelForCausalLM.from_pretrained(model_path,
                                                  device_map="auto", torch_dtype=torch.bfloat16)
     model.enable_input_require_grads()
@@ -97,12 +131,12 @@ def train(lora_num):
 
     args = TrainingArguments(
         output_dir=output_dir,
-        per_device_train_batch_size=8,
+        per_device_train_batch_size=16,
         gradient_accumulation_steps=4,
         logging_steps=3,
-        num_train_epochs=3,
+        num_train_epochs=2,
         save_steps=600,
-        learning_rate=1e-5,
+        learning_rate=5e-5,
         weight_decay=0.01,  # 默认参数
         warmup_steps=int(0.5 * (len(tokenized_dataset) // (8 * 4))),
         # save_on_each_node=True,
@@ -128,13 +162,24 @@ def train(lora_num):
                 except Exception as e:
                     pass
 
+    swanlab_callback = SwanLabCallback(
+        project="Qwen2-mmlu-fintune",
+        experiment_name=f"Qwen2-1.5B-Instruct-lora-{lora_num}",
+        description="使用通义千问Qwen2-1.5B-Instruct模型在zh_cls_fudan-news数据集上微调。",
+        config={
+            "model": f"qwen/Qwen2-1.5B-Instruct-lora-{lora_num}",
+            "dataset": "mmlu",
+        }
+    )
+
     trainer = Trainer(
         model=model,
         args=args,
         train_dataset=train_dataset,
         # eval_dataset=test_dataset,
         data_collator=DataCollatorForSeq2Seq(tokenizer=tokenizer, padding=True),
-        callbacks=[CustomLoggingCallback]
+        # callbacks=[CustomLoggingCallback,swanlab_callback]
+        callbacks=[swanlab_callback]
         # compute_metrics=compute_metrics
     )
     try:
