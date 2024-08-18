@@ -12,8 +12,6 @@ from peft import LoraConfig, TaskType, get_peft_model
 from swanlab.integration.huggingface import SwanLabCallback
 # import wandb
 
-#TODO: 创建一个github私钥，然后用ssh clone和推送代码
-
 # 设置日志文件
 logging.basicConfig(filename='training_log.txt', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -44,8 +42,8 @@ def load_mmlu_data(data_path, dataset_split="train", sample_size=200):
 dataset = load_mmlu_data("/root/autodl-tmp/data/mmlu/all/auxiliary_train-00000-of-00001.parquet")
 # dataset = load_mmlu_data("/root/autodl-tmp/data/mmlu/all/validation-00000-of-00001.parquet")
 
-model_path = "/root/autodl-tmp/models/qwen/Qwen2-1___5B"
-output_dir_prefix = "./output/qwen15"
+model_path = "/root/autodl-tmp/models/qwen/Qwen2-7B"
+output_dir_prefix = "./output/qwen7"
 
 #all_dataset = dataset['train'].select(range(500))
 all_dataset = dataset.select(range(20000))
@@ -132,16 +130,16 @@ def train(lora_num):
 
     args = TrainingArguments(
         output_dir=output_dir,
-        per_device_train_batch_size=16,
+        per_device_train_batch_size=8,
         gradient_accumulation_steps=4,
         logging_steps=3,
-        num_train_epochs=2,
+        num_train_epochs=3,
         save_steps=600,
         learning_rate=5e-5,
         weight_decay=0.01,  # 默认参数
-        warmup_steps=int(0.5 * (len(tokenized_dataset) // (8 * 4))),
-        # save_on_each_node=True,
-        # gradient_checkpointing=True,
+        warmup_steps=int(0.33 * (len(tokenized_dataset) // (8 * 4))),
+        save_on_each_node=True,
+        gradient_checkpointing=True,
         # report_to="wandb",
         report_to="none",
     )
@@ -165,10 +163,10 @@ def train(lora_num):
 
     swanlab_callback = SwanLabCallback(
         project="Qwen2-mmlu-fintune",
-        experiment_name=f"Qwen2-1.5B-Instruct-lora-{lora_num}",
-        description="使用通义千问Qwen2-1.5B-Instruct模型在zh_cls_fudan-news数据集上微调。",
+        experiment_name=f"Qwen2-7B-Instruct-lora-{lora_num}",
+        description="使用通义千问Qwen2-7B-数据集上微调。",
         config={
-            "model": f"qwen/Qwen2-1.5B-Instruct-lora-{lora_num}",
+            "model": f"qwen/Qwen2-7B-lora-{lora_num}",
             "dataset": "mmlu",
         }
     )
@@ -202,9 +200,11 @@ def main():
     train(lora_num)
     print(f"Finished training with r={lora_num}")
 
+
 if __name__ == '__main__':
-    # loras = [2,4,8,12,16,32,64]
+    # loras = [4,2,8,12,16,32,64]
     # for lora_num in loras:
     #     print(f"current processing r={lora_num}")
     #     train(lora_num)
+
     main()

@@ -39,9 +39,9 @@ def process_func(example):
     # Llama分词器会将一个中文字切分为多个token，因此需要放开一些最大长度，保证数据的完整性
     input_ids, attention_mask, labels = [], [], []
     instruction = tokenizer \
-        (f"<|start_header_id|>user<|end_header_id|>\n\n{example['instruction_zh'] + example['input_zh']}<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n",
+        (f"You are a very helpful assistant. Please Answer the following question: ###Instruction: \n{example['instruction']}\n ###Input(could be empty): {example['input']}\n",
          add_special_tokens=False)
-    response = tokenizer(f"{example['output']}<|eot_id|>", add_special_tokens=False)
+    response = tokenizer(f"{example['output']}", add_special_tokens=False)
     input_ids = instruction["input_ids"] + response["input_ids"] + [tokenizer.pad_token_id]
     attention_mask = instruction["attention_mask"] + response["attention_mask"] + [1]  # 因为eos token咱们也是要关注的所以 补充为1
     labels = [-100] * len(instruction["input_ids"]) + response["input_ids"] + [tokenizer.pad_token_id]

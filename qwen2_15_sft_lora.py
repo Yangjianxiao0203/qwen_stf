@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 
@@ -41,7 +42,7 @@ def process_func(example):
     instruction = tokenizer \
         (f"You are a very helpful assistant. Please Answer the following question: \n{example['instruction'] + example['input']}\n",
          add_special_tokens=False)
-    response = tokenizer(f"{example['output']}<|eot_id|>", add_special_tokens=False)
+    response = tokenizer(f"{example['output']}", add_special_tokens=False)
     input_ids = instruction["input_ids"] + response["input_ids"] + [tokenizer.pad_token_id]
     attention_mask = instruction["attention_mask"] + response["attention_mask"] + [1]  # 因为eos token咱们也是要关注的所以 补充为1
     labels = [-100] * len(instruction["input_ids"]) + response["input_ids"] + [tokenizer.pad_token_id]
@@ -95,14 +96,14 @@ def train(lora_num):
 
     args = TrainingArguments(
         output_dir=output_dir,
-        per_device_train_batch_size=8,
+        per_device_train_batch_size=16,
         gradient_accumulation_steps=4,
         logging_steps=3,
-        num_train_epochs=3,
+        num_train_epochs=2,
         save_steps=600,
-        learning_rate=1e-5,
+        learning_rate=3e-5,
         weight_decay=0.01,  # 默认参数
-        warmup_steps=int(0.5 * (len(tokenized_dataset) // (8 * 4))),
+        warmup_steps=int(0.33 * (len(tokenized_dataset) // (16 * 4))),
         # save_on_each_node=True,
         # gradient_checkpointing=True,
         # report_to="wandb",
@@ -153,8 +154,21 @@ def train(lora_num):
     trainer.save_model(model_save_path)
     tokenizer.save_pretrained(model_save_path)
 
+def main():
+    parser = argparse.ArgumentParser(description='Run LoRA training')
+    parser.add_argument('--lora_num', type=int, required=True, help='LoRA parameter value')
+    args = parser.parse_args()
+
+    lora_num = args.lora_num
+    print(f"Starting training with r={lora_num}")
+    train(lora_num)
+    print(f"Finished training with r={lora_num}")
+
+
 if __name__ == '__main__':
-    loras = [4,2,8,12,16,32,64]
-    for lora_num in loras:
-        print(f"current processing r={lora_num}")
-        train(lora_num)
+    # loras = [4,2,8,12,16,32,64]
+    # for lora_num in loras:
+    #     print(f"current processing r={lora_num}")
+    #     train(lora_num)
+
+    main()

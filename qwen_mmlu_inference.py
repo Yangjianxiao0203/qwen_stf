@@ -5,7 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 import json
 
-base_model_name = "/root/autodl-tmp/models/qwen/Qwen2-1___5B"
+base_model_name = "/root/autodl-tmp/models/qwen/Qwen2-7B"
 base_model = True
 
 def load_mmlu_data(data_path, dataset_split="train", sample_size=200):
@@ -160,14 +160,14 @@ def main(model_lora_path):
 
 if __name__ == "__main__":
     model_lora_paths = [
-        # "qwen2_1.5B_base_model"
-        # "./output/qwen15/final_model_r_2",
-        # "./output/qwen15/final_model_r_4",
-        # "./output/qwen15/final_model_r_8",
-        # "./output/qwen15/final_model_r_12",
+        "qwen2_7B_base_model",
+        "./output/qwen7/final_model_r_2",
+        "./output/qwen7/final_model_r_4",
+        "./output/qwen7/final_model_r_8",
+        "./output/qwen7/final_model_r_12",
         # "./output/qwen15/final_model_r_16",
-        "./output/llama3/final_model_r_32",
-        "./output/llama3/final_model_r_64",
+        # "./output/qwen15/final_model_r_32",
+        # "./output/qwen15/final_model_r_64",
     ]
     for model_lora_path in model_lora_paths:
         print("*" * 30)
